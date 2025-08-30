@@ -12,16 +12,29 @@ except ModuleNotFoundError:
     API_KEY = os.environ.get("BREVO_API_KEY", "")
 import os
 
+# Add import for ApiException
+try:
+    from sib_api_v3_sdk.rest import ApiException
+except ImportError:
+    ApiException = Exception  # fallback if SDK not available
+
 st.set_page_config(
     page_title="Brevo Automation Dashboard",
     page_icon="✉️",
     layout="wide"
 )
 
-# Initialize the automation agent
+# Initialize the automation agent with error handling
 @st.cache_resource
 def init_agent():
-    return AutomationAgent(API_KEY if API_KEY is not None else "")
+    try:
+        return AutomationAgent(API_KEY if API_KEY is not None else "")
+    except ApiException as e:
+        st.error("Failed to initialize Brevo AutomationAgent. Please check your API key and network connectivity.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Unexpected error initializing AutomationAgent: {e}")
+        st.stop()
 
 agent = init_agent()
 
