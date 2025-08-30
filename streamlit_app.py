@@ -351,13 +351,13 @@ elif menu == "Execute Workflow":
     template_names = list(templates.keys())
     col1, col2, col3 = st.columns(3)
     with col1:
-        tuesday_template_name = st.selectbox("Tuesday Template", options=template_names)
+        tuesday_template_name = st.selectbox("Template 1", options=template_names)
         tuesday_template = templates.get(tuesday_template_name, 0)
     with col2:
-        friday_template_name = st.selectbox("Friday Template", options=template_names)
+        friday_template_name = st.selectbox("Template 2", options=template_names)
         friday_template = templates.get(friday_template_name, 0)
     with col3:
-        post_event_template_name = st.selectbox("Post-Event Template", options=template_names)
+        post_event_template_name = st.selectbox("Template 3", options=template_names)
         post_event_template = templates.get(post_event_template_name, 0)
 
     # Event date
