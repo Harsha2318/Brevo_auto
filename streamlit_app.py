@@ -24,6 +24,30 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Simple Login Authentication ---
+
+# Define valid users (for demo, use environment variables or config for production)
+VALID_USERS = {
+    "admin": "admin",
+    "user1": "123"
+}
+
+def login():
+    st.sidebar.title("🔒 Login")
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if username in VALID_USERS and VALID_USERS[username] == password:
+            st.session_state["authenticated"] = True
+            st.session_state["username"] = username
+            st.sidebar.success(f"Welcome, {username}!")
+        else:
+            st.sidebar.error("Invalid username or password.")
+
+if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+    login()
+    st.stop()
+
 # Initialize the automation agent with error handling
 @st.cache_resource
 def init_agent():
