@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from brevo_automation import AutomationAgent
 from config import API_KEY
 import requests
+import os
 
 st.set_page_config(
     page_title="Brevo Automation Dashboard",
@@ -14,7 +15,7 @@ st.set_page_config(
 # Initialize the automation agent
 @st.cache_resource
 def init_agent():
-    return AutomationAgent(API_KEY)
+    return AutomationAgent(API_KEY if API_KEY is not None else "")
 
 agent = init_agent()
 
@@ -129,6 +130,7 @@ elif menu == "Import Contacts":
         "top_leaderboard_users",
         "users_inactive_mentorship"
     ]
+    USER_RETENTION_API_URL = os.getenv("USER_RETENTION_API_URL", "http://localhost:5000/api/user-retention/emails")
 
     df = None
     if data_source == "Upload CSV":
@@ -144,7 +146,7 @@ elif menu == "Import Contacts":
             st.session_state['import_df'] = df
     else:
         selected_category = st.selectbox("Select Category", options=category_options, index=0)
-        api_url = f"http://localhost:5000/api/user-retention/emails/{selected_category}"
+        api_url = f"{USER_RETENTION_API_URL}/{selected_category}"
         if st.button("Fetch Emails"):
             try:
                 response = requests.get(api_url)
@@ -241,8 +243,66 @@ elif menu == "Schedule Campaigns":
 elif menu == "Execute Workflow":
     st.header("Execute Complete Workflow")
 
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+    # Option to choose data source
+    data_source = st.radio("Select Data Source", ["Upload CSV", "Fetch from API"], horizontal=True)
     list_name = st.text_input("List Name", "Event Participants List")
+
+    # Available categories for API fetch
+    category_options = [
+        "users_with_unsubmitted_projects",
+        "users_with_incomplete_courses",
+        "users_close_to_completing_courses",
+        "users_with_unstarted_roadmaps",
+        "users_with_incomplete_roadmaps",
+        "users_without_interviews",
+        "users_without_resumes",
+        "users_for_new_features",
+        "users_without_prompt_engineering",
+        "users_with_high_scores",
+        "users_in_talent_pool",
+        "users_with_low_talent_scores",
+        "users_with_incomplete_profiles",
+        "users_without_mock_interviews",
+        "users_close_to_leaderboard_top",
+        "users_with_stalled_projects",
+        "users_without_project_applications",
+        "inactive_users",
+        "users_for_new_problems",
+        "top_leaderboard_users",
+        "users_inactive_mentorship"
+    ]
+    USER_RETENTION_API_URL = os.getenv("USER_RETENTION_API_URL", "http://localhost:5000/api/user-retention/emails")
+
+    df = None
+    if data_source == "Upload CSV":
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+        if uploaded_file is not None:
+            with open("temp_workflow.csv", "wb") as f:
+                f.write(uploaded_file.getvalue())
+            df = pd.read_csv("temp_workflow.csv")
+            st.write("Preview of uploaded data:")
+            st.dataframe(df.head())
+            st.session_state['workflow_df'] = df
+    else:
+        selected_category = st.selectbox("Select Category", options=category_options, index=0)
+        api_url = f"{USER_RETENTION_API_URL}/{selected_category}"
+        if st.button("Fetch Emails"):
+            try:
+                response = requests.get(api_url)
+                if response.status_code == 200:
+                    data = response.json()
+                    emails = data.get("emails", [])
+                    if isinstance(emails, list):
+                        df = pd.DataFrame({"email": list(set(emails))})
+                        st.write(f"Preview of fetched emails for {selected_category}:")
+                        st.dataframe(df.head())
+                        st.session_state['workflow_df'] = df
+                    else:
+                        st.error("API did not return a list of emails.")
+                else:
+                    st.error(f"API request failed: {response.status_code}")
+            except Exception as e:
+                st.error(f"Error fetching from API: {e}")
 
     # Template IDs
     template_names = list(templates.keys())
@@ -260,13 +320,12 @@ elif menu == "Execute Workflow":
     # Event date
     event_end_date = st.date_input("Event End Date")
 
-    if uploaded_file is not None:
-        # Save the uploaded file temporarily
-        with open("temp_workflow.csv", "wb") as f:
-            f.write(uploaded_file.getvalue())
-
+    workflow_df = st.session_state.get('workflow_df', None)
+    if workflow_df is not None:
         if st.button("Execute Workflow"):
             with st.spinner("Executing workflow..."):
+                temp_path = "temp_workflow.csv"
+                workflow_df.to_csv(temp_path, index=False)
                 selected_templates = {
                     "tuesday": tuesday_template,
                     "friday": friday_template,
@@ -274,7 +333,7 @@ elif menu == "Execute Workflow":
                 }
 
                 result = agent.execute_workflow(
-                    csv_path="temp_workflow.csv",
+                    csv_path=temp_path,
                     list_name=list_name,
                     selected_templates=selected_templates,
                     sender_info={"name": "", "email": ""},
