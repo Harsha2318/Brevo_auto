@@ -141,6 +141,7 @@ elif menu == "Import Contacts":
             df = pd.read_csv("temp_contacts.csv")
             st.write("Preview of uploaded data:")
             st.dataframe(df.head())
+            st.session_state['import_df'] = df
     else:
         selected_category = st.selectbox("Select Category", options=category_options, index=0)
         api_url = f"http://localhost:5000/api/user-retention/emails/{selected_category}"
@@ -154,6 +155,7 @@ elif menu == "Import Contacts":
                         df = pd.DataFrame({"email": list(set(emails))})
                         st.write(f"Preview of fetched emails for {selected_category}:")
                         st.dataframe(df.head())
+                        st.session_state['import_df'] = df
                     else:
                         st.error("API did not return a list of emails.")
                 else:
@@ -161,12 +163,12 @@ elif menu == "Import Contacts":
             except Exception as e:
                 st.error(f"Error fetching from API: {e}")
 
-    if df is not None:
+    import_df = st.session_state.get('import_df', None)
+    if import_df is not None:
         if st.button("Import Contacts"):
             with st.spinner("Importing contacts..."):
-                # Save to temp file for import_contacts
                 temp_path = "temp_contacts.csv"
-                df.to_csv(temp_path, index=False)
+                import_df.to_csv(temp_path, index=False)
                 result = agent.import_contacts(
                     temp_path,
                     list_name,
