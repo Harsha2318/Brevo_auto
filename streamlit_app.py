@@ -28,8 +28,8 @@ st.set_page_config(
 
 # Define valid users (for demo, use environment variables or config for production)
 VALID_USERS = {
-    "admin": "admin",
-    "user1": "123"
+    "admin": "admin123",
+    "user": "user123"
 }
 
 def login():
