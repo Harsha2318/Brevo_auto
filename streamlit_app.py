@@ -1,9 +1,15 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from brevo_automation import AutomationAgent
-from config import API_KEY
 import requests
+import os
+try:
+    from brevo_automation import AutomationAgent
+    from config import API_KEY
+except ModuleNotFoundError:
+    # Fallback for Streamlit Cloud: use environment variable directly
+    from brevo_automation import AutomationAgent
+    API_KEY = os.environ.get("BREVO_API_KEY", "")
 import os
 
 st.set_page_config(
