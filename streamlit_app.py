@@ -92,7 +92,6 @@ if menu == "Home":
 
 elif menu == "Import Contacts":
     st.header("Import Contacts")
-    
     # Add folder selection
     folders = get_folders()
     selected_folder = st.selectbox(
@@ -100,31 +99,81 @@ elif menu == "Import Contacts":
         options=list(folders.keys()),
         index=0
     )
-    
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+
+
+    # Option to choose data source
+    data_source = st.radio("Select Data Source", ["Upload CSV", "Fetch from API"], horizontal=True)
     list_name = st.text_input("List Name", "My Contact List")
-    
-    if uploaded_file is not None:
-        # Save the uploaded file temporarily
-        with open("temp_contacts.csv", "wb") as f:
-            f.write(uploaded_file.getvalue())
-        
-        # Show preview of the data
-        df = pd.read_csv("temp_contacts.csv")
-        st.write("Preview of uploaded data:")
-        st.dataframe(df.head())
-        
+
+    # Available categories for API fetch
+    category_options = [
+        "users_with_unsubmitted_projects",
+        "users_with_incomplete_courses",
+        "users_close_to_completing_courses",
+        "users_with_unstarted_roadmaps",
+        "users_with_incomplete_roadmaps",
+        "users_without_interviews",
+        "users_without_resumes",
+        "users_for_new_features",
+        "users_without_prompt_engineering",
+        "users_with_high_scores",
+        "users_in_talent_pool",
+        "users_with_low_talent_scores",
+        "users_with_incomplete_profiles",
+        "users_without_mock_interviews",
+        "users_close_to_leaderboard_top",
+        "users_with_stalled_projects",
+        "users_without_project_applications",
+        "inactive_users",
+        "users_for_new_problems",
+        "top_leaderboard_users",
+        "users_inactive_mentorship"
+    ]
+
+    df = None
+    if data_source == "Upload CSV":
+        uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+        if uploaded_file is not None:
+            # Save the uploaded file temporarily
+            with open("temp_contacts.csv", "wb") as f:
+                f.write(uploaded_file.getvalue())
+            # Show preview of the data
+            df = pd.read_csv("temp_contacts.csv")
+            st.write("Preview of uploaded data:")
+            st.dataframe(df.head())
+    else:
+        selected_category = st.selectbox("Select Category", options=category_options, index=0)
+        api_url = f"http://localhost:5000/api/user-retention/emails/{selected_category}"
+        if st.button("Fetch Emails"):
+            try:
+                response = requests.get(api_url)
+                if response.status_code == 200:
+                    data = response.json()
+                    emails = data.get("emails", [])
+                    if isinstance(emails, list):
+                        df = pd.DataFrame({"email": list(set(emails))})
+                        st.write(f"Preview of fetched emails for {selected_category}:")
+                        st.dataframe(df.head())
+                    else:
+                        st.error("API did not return a list of emails.")
+                else:
+                    st.error(f"API request failed: {response.status_code}")
+            except Exception as e:
+                st.error(f"Error fetching from API: {e}")
+
+    if df is not None:
         if st.button("Import Contacts"):
             with st.spinner("Importing contacts..."):
+                # Save to temp file for import_contacts
+                temp_path = "temp_contacts.csv"
+                df.to_csv(temp_path, index=False)
                 result = agent.import_contacts(
-                    "temp_contacts.csv", 
+                    temp_path,
                     list_name,
                     folder_id=folders[selected_folder]
                 )
-                
                 if result["status"] == "success":
                     st.success(result["message"])
-                    # Store the list ID for campaign scheduling
                     st.session_state['last_list_id'] = result["list_id"]
                 else:
                     st.error(f"Import failed: {result['message']}")
