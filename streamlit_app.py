@@ -96,15 +96,21 @@ def get_verified_senders():
 
 @st.cache_data
 def get_templates():
-    """Fetch available campaign templates dynamically using AutomationAgent."""
+    """Fetch only valid campaign templates using AutomationAgent."""
     templates = agent.get_templates()
-    return {template["name"]: template["id"] for template in templates}
+    # Only keep templates that are active and have a valid ID
+    valid_templates = {
+        template["name"]: template["id"]
+        for template in templates
+        if template.get("active", True) and isinstance(template.get("id"), int) and template.get("id") > 0
+    }
+    return valid_templates
 
 # Sidebar
 st.sidebar.title("✉️ Brevo Automation")
 menu = st.sidebar.selectbox(
     "Select Operation",
-    ["Home", "Import Contacts", "Schedule Campaigns", "Execute Workflow"]
+    ["Import Contacts", "Schedule Campaigns"]
 )
 
 # Main area header
@@ -122,7 +128,6 @@ if menu == "Home":
     
     - **Import Contacts**: Upload your CSV file and create contact lists
     - **Schedule Campaigns**: Set up email campaigns with custom templates
-    - **Execute Workflow**: Run complete email campaign workflows
     
     ### Getting Started
     1. Select an operation from the sidebar
@@ -363,6 +368,16 @@ elif menu == "Execute Workflow":
     # Event date
     event_end_date = st.date_input("Event End Date")
 
+    # --- Add sender selection ---
+    senders = get_verified_senders()
+    if senders:
+        sender_name = st.selectbox("Select Sender", options=list(senders.keys()))
+        sender_email = senders[sender_name]
+    else:
+        st.error("No verified senders found. Please verify a sender in Brevo first.")
+        sender_name = ""
+        sender_email = ""
+
     workflow_df = st.session_state.get('workflow_df', None)
     if workflow_df is not None:
         if st.button("Execute Workflow"):
@@ -375,11 +390,12 @@ elif menu == "Execute Workflow":
                     "post_event": post_event_template
                 }
 
+                # Pass sender info from selection
                 result = agent.execute_workflow(
                     csv_path=temp_path,
                     list_name=list_name,
                     selected_templates=selected_templates,
-                    sender_info={"name": "", "email": ""},
+                    sender_info={"name": sender_name, "email": sender_email},
                     event_end_date=datetime.combine(event_end_date, datetime.min.time())
                 )
 
