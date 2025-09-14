@@ -99,11 +99,14 @@ def get_templates():
     """Fetch only valid campaign templates using AutomationAgent."""
     templates = agent.get_templates()
     # Only keep templates that are active and have a valid ID
-    valid_templates = {
-        template["name"]: template["id"]
-        for template in templates
-        if template.get("active", True) and isinstance(template.get("id"), int) and template.get("id") > 0
-    }
+    valid_templates = {}
+    for template in templates:
+        template_id = template.get("id")
+        if (template.get("active", True) and
+            isinstance(template_id, int) and
+            template_id is not None and
+            template_id > 0):
+            valid_templates[template["name"]] = template_id
     return valid_templates
 
 # Sidebar
@@ -151,7 +154,7 @@ elif menu == "Import Contacts":
 
 
     # Option to choose data source
-    data_source = st.radio("Select Data Source", ["Upload CSV", "Fetch from API"], horizontal=True)
+    data_source = st.radio("Select Data Source", ["Upload CSV", "Fetch from API", "Fetch from Cohort API"], horizontal=True)
     list_name = st.text_input("List Name", "My Contact List")
 
     # Available categories for API fetch
@@ -192,7 +195,7 @@ elif menu == "Import Contacts":
             st.write("Preview of uploaded data:")
             st.dataframe(df.head())
             st.session_state['import_df'] = df
-    else:
+    elif data_source == "Fetch from API":
         selected_category = st.selectbox("Select Category", options=category_options, index=0)
         api_url = f"{USER_RETENTION_API_URL}/{selected_category}"
         if st.button("Fetch Emails"):
@@ -212,6 +215,17 @@ elif menu == "Import Contacts":
                     st.error(f"API request failed: {response.status_code}")
             except Exception as e:
                 st.error(f"Error fetching from API: {e}")
+    elif data_source == "Fetch from Cohort API":
+        if st.button("Fetch Cohort Emails"):
+            try:
+                from api import get_cohort_emails
+                emails = get_cohort_emails()
+                df = pd.DataFrame({"email": list(set(emails))})
+                st.write("Preview of fetched cohort emails:")
+                st.dataframe(df.head())
+                st.session_state['import_df'] = df
+            except Exception as e:
+                st.error(f"Error fetching from Cohort API: {e}")
 
     import_df = st.session_state.get('import_df', None)
     if import_df is not None:
@@ -292,7 +306,7 @@ elif menu == "Execute Workflow":
     st.header("Execute Complete Workflow")
 
     # Option to choose data source
-    data_source = st.radio("Select Data Source", ["Upload CSV", "Fetch from API"], horizontal=True)
+    data_source = st.radio("Select Data Source", ["Upload CSV", "Fetch from API", "Fetch from Cohort API"], horizontal=True)
     list_name = st.text_input("List Name", "Event Participants List")
 
     # Available categories for API fetch
@@ -331,7 +345,7 @@ elif menu == "Execute Workflow":
             st.write("Preview of uploaded data:")
             st.dataframe(df.head())
             st.session_state['workflow_df'] = df
-    else:
+    elif data_source == "Fetch from API":
         selected_category = st.selectbox("Select Category", options=category_options, index=0)
         api_url = f"{USER_RETENTION_API_URL}/{selected_category}"
         if st.button("Fetch Emails"):
@@ -351,6 +365,17 @@ elif menu == "Execute Workflow":
                     st.error(f"API request failed: {response.status_code}")
             except Exception as e:
                 st.error(f"Error fetching from API: {e}")
+    elif data_source == "Fetch from Cohort API":
+        if st.button("Fetch Cohort Emails"):
+            try:
+                from api import get_cohort_emails
+                emails = get_cohort_emails()
+                df = pd.DataFrame({"email": list(set(emails))})
+                st.write("Preview of fetched cohort emails:")
+                st.dataframe(df.head())
+                st.session_state['workflow_df'] = df
+            except Exception as e:
+                st.error(f"Error fetching from Cohort API: {e}")
 
     # Template IDs
     template_names = list(templates.keys())
@@ -391,13 +416,17 @@ elif menu == "Execute Workflow":
                 }
 
                 # Pass sender info from selection
-                result = agent.execute_workflow(
-                    csv_path=temp_path,
-                    list_name=list_name,
-                    selected_templates=selected_templates,
-                    sender_info={"name": sender_name, "email": sender_email},
-                    event_end_date=datetime.combine(event_end_date, datetime.min.time())
-                )
+                if sender_name and sender_email:
+                    result = agent.execute_workflow(
+                        csv_path=temp_path,
+                        list_name=list_name,
+                        selected_templates=selected_templates,
+                        sender_info={"name": sender_name, "email": sender_email},
+                        event_end_date=datetime.combine(event_end_date, datetime.min.time())
+                    )
+                else:
+                    st.error("Please select a valid sender before executing the workflow.")
+                    st.stop()
 
                 st.subheader("Workflow Results")
                 st.write("Steps Executed:")
